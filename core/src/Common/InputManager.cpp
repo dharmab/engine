@@ -1,9 +1,6 @@
 #include "InputManager.h"
-#include "InputView.h"
-#include "KeyboardKeyPressEvent.h"
-#include "KeyboardKeyReleaseEvent.h"
-#include "MouseButtonPressEvent.h"
-#include "MouseButtonReleaseEvent.h"
+#include "KeyPressEvent.h"
+#include "KeyReleaseEvent.h"
 
 InputManager::InputManager()
 {
@@ -13,132 +10,99 @@ InputManager::~InputManager()
 {
 }
 
-void InputManager::SetView(std::shared_ptr<InputView> inputView)
+void InputManager::CopyFrom(InputManager* other)
 {
-    this->inputView = inputView;
+   this->inputView = other->inputView; 
+   this->registeredKeyPressEventHandlers = other->registeredKeyPressEventHandlers;
+   this->registeredKeyReleaseEventHandlers = other->registeredKeyReleaseEventHandlers;
 }
 
-void InputManager::SetMouseInputMode(MouseInputMode mode)
+void InputManager::SetView(InputView* inputView)
 {
-    this->inputView.lock()->SetMouseInputMode(mode);
+	this->inputView = inputView;
 }
 
-MouseInputMode InputManager::GetMouseInputMode()
+void InputManager::RegisterKeyPressEventHandler(IKeyPressEventHandler* handler, std::vector<KeyCode> keyCodes)
 {
-    return this->inputView.lock()->GetMouseInputMode();
+	for (KeyCode keyCode : keyCodes)
+	{
+        int intCode = static_cast<int>(keyCode);
+		std::set<IKeyPressEventHandler*> handlers = this->registeredKeyPressEventHandlers[intCode];
+		handlers.insert(handler);
+		this->registeredKeyPressEventHandlers[intCode] = handlers;
+	}
 }
 
-void InputManager::RegisterMouseMotionHandler(MouseMotionHandler handler)
+void InputManager::DeregisterKeyPressEventHandler(IKeyPressEventHandler* handler, std::vector<KeyCode> keyCodes)
 {
-    this->mouseMotionHandler = handler;
-}
-
-void InputManager::RegisterMouseButtonPressHandler(MouseButton button, MouseButtonPressHandler handler)
-{
-    this->mouseButtonPressHandlers[button] = handler;
-}
-
-void InputManager::RegisterMouseButtonReleaseHandler(MouseButton button, MouseButtonReleaseHandler handler)
-{
-    this->mouseButtonReleaseHandlers[button] = handler;
-}
-
-void InputManager::RegisterKeyboardKeyPressHandler(KeyboardKey key, KeyboardKeyPressHandler handler)
-{
-    this->keyboardKeyPressHandlers[key] = handler;
-}
-
-void InputManager::RegisterKeyboardKeyReleaseHandler(KeyboardKey key, KeyboardKeyReleaseHandler handler)
-{
-    this->keyboardKeyReleaseHandlers[key] = handler;
-}
-
-void InputManager::DeregisterMouseMotionHandler()
-{
-    this->mouseMotionHandler = nullptr;
-}
-
-void InputManager::DeregisterMouseButtonPressHandler(MouseButton button)
-{
-    this->mouseButtonPressHandlers.erase(button);
-}
-
-void InputManager::DeregisterMouseButtonReleaseHandler(MouseButton button)
-{
-    this->mouseButtonReleaseHandlers.erase(button);
-}
-
-void InputManager::DeregisterKeyboardKeyPressHandler(KeyboardKey key)
-{
-    this->keyboardKeyPressHandlers.erase(key);
-}
-
-void InputManager::DeregisterKeyboardKeyReleaseHandler(KeyboardKey key)
-{
-    this->keyboardKeyReleaseHandlers.erase(key);
-}
-
-bool InputManager::IsRegisteredEventHandler(KeyboardKey key)
-{
-    return (this->keyboardKeyPressHandlers[key]) || (this->keyboardKeyReleaseHandlers[key]);
-}
-
-InputState InputManager::GetKeyState(KeyboardKey key)
-{
-    return inputView.lock()->GetKeyboardKeyState(key);
-}
-
-InputState InputManager::GetMouseButtonState(MouseButton button)
-{
-    return inputView.lock()->GetMouseButtonState(button);
-}
-
-int InputManager::GetMouseX()
-{
-    return inputView.lock()->GetMouseX();
-}
-
-int InputManager::GetMouseY()
-{
-    return inputView.lock()->GetMouseY();
-}
-
-void InputManager::OnKeyboardKeyPress(KeyboardKeyPressEvent event) 
-{
-    if (this->keyboardKeyPressHandlers[event.key])
+	for (KeyCode keyCode : keyCodes)
     {
-        this->keyboardKeyPressHandlers[event.key](event);
-    }
+        int intCode = static_cast<int>(keyCode);
+		std::set<IKeyPressEventHandler*> handlers = this->registeredKeyPressEventHandlers[intCode];
+        handlers.erase(handler);
+		this->registeredKeyPressEventHandlers[intCode] = handlers;
+	}
+};
+
+void InputManager::RegisterKeyReleaseEventHandler(IKeyReleaseEventHandler* handler, std::vector<KeyCode> keyCodes)
+{
+	for (KeyCode keyCode : keyCodes)
+	{
+        int intCode = static_cast<int>(keyCode);
+		std::set<IKeyReleaseEventHandler*> handlers =  this->registeredKeyReleaseEventHandlers[intCode];
+		handlers.erase(handler);
+		this->registeredKeyReleaseEventHandlers[intCode] = handlers;
+	}
+};
+
+void InputManager::DeregisterKeyReleaseEventHandler(IKeyReleaseEventHandler* handler, std::vector<KeyCode> keyCodes)
+{
+	for (KeyCode keyCode : keyCodes)
+	{
+        int intCode = static_cast<int>(keyCode);
+		std::set<IKeyReleaseEventHandler*> handlers = this->registeredKeyReleaseEventHandlers[intCode];
+		handlers.erase(handler);
+		this->registeredKeyReleaseEventHandlers[intCode] = handlers;
+	};
+
+};
+
+bool InputManager::IsRegisteredKeyPress(KeyCode* keyCode)
+{
+    int intCode = static_cast<int>(*keyCode);
+    std::set<IKeyPressEventHandler*>* handlers = &(this->registeredKeyPressEventHandlers[intCode]);
+    return handlers->size() != 0;
 }
 
-void InputManager::OnKeyboardKeyRelease(KeyboardKeyReleaseEvent event) 
+bool InputManager::IsRegisteredKeyRelease(KeyCode* keyCode)
 {
-    if (this->keyboardKeyReleaseHandlers[event.key])
-    {
-        this->keyboardKeyReleaseHandlers[event.key](event);
-    }
+    int intCode = static_cast<int>(*keyCode);
+    std::set<IKeyReleaseEventHandler*>* handlers = &(this->registeredKeyReleaseEventHandlers[intCode]);
+    return handlers->size() != 0;
 }
 
-void InputManager::OnMouseInput(MouseEvent event)
+InputState InputManager::GetKeyState(KeyCode keyCode)
 {
-    if (this->mouseMotionHandler)
-    {
-        this->mouseMotionHandler(event);
-    }
+    return inputView->GetKeyState(keyCode);
 }
 
-void InputManager::OnMouseButtonPress(MouseButtonPressEvent event)
+void InputManager::OnKeyPressEvent(KeyPressEvent* event) 
 {
-    if (this->mouseButtonPressHandlers[event.button])
+    int intCode = static_cast<int>(event->GetKeyCode());
+    std::set<IKeyPressEventHandler*> handlers = this->registeredKeyPressEventHandlers[intCode];
+    for (IKeyPressEventHandler* handler : handlers)
     {
-        this->mouseButtonPressHandlers[event.button](event);
+       handler->OnKeyPressEvent(event);
     }
-}
+};
 
-void InputManager::OnMouseButtonRelease(MouseButtonReleaseEvent event)
+void InputManager::OnKeyReleaseEvent(KeyReleaseEvent* event) 
 {
-    if (this->mouseButtonReleaseHandlers[event.button])
+    int intCode = static_cast<int>(event->GetKeyCode());
+    std::set<IKeyReleaseEventHandler*> handlers = this->registeredKeyReleaseEventHandlers[intCode];
+    for (IKeyReleaseEventHandler* handler : handlers)
     {
-        this->mouseButtonReleaseHandlers[event.button](event);
+       handler->OnKeyReleaseEvent(event);
     }
-}
+};
+

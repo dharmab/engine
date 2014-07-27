@@ -1,668 +1,509 @@
 #include "InputView.h"
-#include "SFML/Window/Keyboard.hpp"
-#include "SFML/Window/Mouse.hpp"
-#include "InputManager.h"
-#include "InputState.h"
-#include "KeyboardKeyPressEvent.h"
-#include "KeyboardKeyReleaseEvent.h"
-#include "MouseEvent.h"
-#include "MouseButtonPressEvent.h"
-#include "MouseButtonReleaseEvent.h"
-#include "MouseButton.h"
-#include "KeyboardKey.h"
-#include <assert.h>
+#include "GLFW/glfw3.h"
+#include "KeyPressEvent.h"
+#include "KeyReleaseEvent.h"
 #include <set>
-#include <vector>
+#include "assert.h"
+InputView* InputView::instance;
 
-sf::Vector2i MOUSE_ORIGIN = sf::Vector2i(0, 0);
-
-InputView::InputView(std::shared_ptr<sf::Window> window)
+InputView::InputView(GLFWwindow* window)
 {
     this->window = window;
     this->inputManager = nullptr;
-}
+    InputView::instance = this;
+};
 
 void InputView::Initialize()
 {
-    this->SetMouseInputMode(MouseInputMode::SHOW);
+    glfwSetInputMode(window, GLFW_CURSOR_NORMAL, GL_FALSE);
+	glfwSetKeyCallback(window, InputView::keyCallbackDispatcher);
 }
 
-void InputView::Update(std::shared_ptr<InputManager> inputManager)
+void InputView::Update(InputManager* inputManager)
 {
-    this->inputManager = inputManager;
+	this->inputManager = inputManager;
 }
 
-void InputView::SetMouseInputMode(MouseInputMode mode)
+void InputView::keyCallback(GLFWwindow* window, int key, int, int action, int)
 {
-    this->mouseInputMode = mode;
-    if (mode == MouseInputMode::SHOW)
-    {
-        this->window->setMouseCursorVisible(true);
-    }
-    else
-    {
-        this->window->setMouseCursorVisible(false);
-    }
-}
-
-MouseInputMode InputView::GetMouseInputMode()
-{
-    return this->mouseInputMode;
-}
-
-void InputView::OnSfmlEvent(sf::Event event)
-{
-    if (event.type == sf::Event::KeyPressed)
-    {
-        onSfmlKeyPressed(event.key);
-    }
-    else if (event.type == sf::Event::KeyReleased)
-    {
-        onSfmlKeyReleased(event.key);
-    }
-    else if (event.type == sf::Event::MouseWheelMoved)
-    {
-        onSfmlMouseWheelMoved(event.mouseWheel);
-    }
-    else if (event.type == sf::Event::MouseMoved)
-    {
-        onSfmlMouseMoved(event.mouseMove);
-    }
-    else if (event.type == sf::Event::JoystickButtonPressed)
-    {
-        onSfmlJoystickButtonPressed(event.joystickButton);
-    }
-    else if (event.type == sf::Event::JoystickButtonReleased)
-    {
-        onSfmlJoystickButtonReleased(event.joystickButton);
-    }
-    else if (event.type == sf::Event::JoystickConnected)
-    {
-        onSfmlJoystickConnected(event.joystickConnect);
-    }
-    else if (event.type == sf::Event::JoystickDisconnected)
-    {
-        onSfmlJoystickDisconnected(event.joystickConnect);
-    }
-    else if (event.type == sf::Event::TextEntered)
-    {
-        onSfmlTextEntered(event.text);
-    }
-}
-
-void InputView::onSfmlKeyPressed(sf::Event::KeyEvent event)
-{
-    if (inputManager != nullptr) 
-    {
-        KeyboardKey key = InputView::nativeKeyboardKey(event.code);
-        if (inputManager->IsRegisteredEventHandler(key))
-        {
-            KeyboardKeyPressEvent nativeEvent(key);
-            this->inputManager->OnKeyboardKeyPress(nativeEvent);
-        }
-    }
-}
-
-void InputView::onSfmlKeyReleased(sf::Event::KeyEvent event)
-{
-    if (inputManager != nullptr) 
-    {
-        KeyboardKey key = InputView::nativeKeyboardKey(event.code);
-        if (inputManager->IsRegisteredEventHandler(key))
-        {
-            KeyboardKeyReleaseEvent event (key);
-            this->inputManager->OnKeyboardKeyRelease(event);
-        }
-    }
-}
-
-void InputView::onSfmlMouseWheelMoved(sf::Event::MouseWheelEvent event)
-{
-    // TODO: mouse wheel input handling
-}
-
-void InputView::onSfmlMouseButtonPressed(sf::Event::MouseButtonEvent event)
-{
-    if (inputManager != nullptr) 
-    {
-        MouseButton button = InputView::nativeMouseButton(event.button);
-        MouseButtonPressEvent nativeEvent(event.x, event.y, button);
-        this->inputManager->OnMouseButtonPress(nativeEvent);
-    }
-}
-
-void InputView::onSfmlMouseButtonReleased(sf::Event::MouseButtonEvent event)
-{
+	assert(window);
     if (inputManager != nullptr)
     {
-        MouseButton button = InputView::nativeMouseButton(event.button);
-        MouseButtonReleaseEvent nativeEvent(event.x, event.y, button);
-        this->inputManager->OnMouseButtonRelease(nativeEvent);
+   	    KeyCode keyCode = InputView::keyCode(key);
+	    if ((inputManager->IsRegisteredKeyPress(&keyCode)) && (action == GLFW_PRESS))
+	    {
+		    KeyPressEvent event(&keyCode);
+		    inputManager->OnKeyPressEvent(&event);
+	    } 
+	    else if ((inputManager->IsRegisteredKeyRelease(&keyCode)) && (action == GLFW_RELEASE))
+	    {
+	    	KeyReleaseEvent event(&keyCode);
+	    	inputManager->OnKeyReleaseEvent(&event);
+	    }
     }
 }
 
-void InputView::onSfmlMouseMoved(sf::Event::MouseMoveEvent event)
+void InputView::keyCallbackDispatcher(GLFWwindow* window, int key, int scanCode, int action, int mods)
 {
-    if (inputManager != nullptr)
+    if (InputView::instance)
     {
-        MouseEvent nativeEvent(event.x, event.y);
-        this->inputManager->OnMouseInput(nativeEvent);
-
-        // Dirty, evil hack to lock the cursor. SFML is working on a native cursor locking
-        // feature beyond SFML 2.2, but for now we have to reset the cursor position manually.
-        if (this->mouseInputMode == MouseInputMode::HIDE_AND_LOCK) 
-        {
-            sf::Mouse::setPosition(MOUSE_ORIGIN, *(this->window));
-        }
+        InputView::instance->keyCallback(window, key, scanCode, action, mods);
     }
 }
 
-void InputView::onSfmlJoystickButtonPressed(sf::Event::JoystickButtonEvent event)
+InputState InputView::GetKeyState(KeyCode keyCode)
 {
-    // TODO: Joystick input
+    int glfwKeyCode = InputView::glfwKeyCode(keyCode);
+    int state = glfwGetKey(this->window, glfwKeyCode);
+    return InputView::keyState(state);
 }
 
-void InputView::onSfmlJoystickButtonReleased(sf::Event::JoystickButtonEvent event)
+InputState InputView::keyState(int glfwKeyState)
 {
-    // TODO: Joystick input
-}
-
-void InputView::onSfmlJoystickMoved(sf::Event::JoystickMoveEvent event)
-{
-    // TODO: Joystick input
-}
-
-void InputView::onSfmlJoystickConnected(sf::Event::JoystickConnectEvent event)
-{
-    // TODO: Joystick input
-}
-
-void InputView::onSfmlJoystickDisconnected(sf::Event::JoystickConnectEvent event)
-{
-    // TODO: Joystick input
-}
-
-void InputView::onSfmlTextEntered(sf::Event::TextEvent event)
-{
-    // TODO: Text entry
-}
-
-InputState InputView::GetKeyboardKeyState(KeyboardKey keyCode)
-{
-    sf::Keyboard::Key sfmlKey = InputView::sfmlKeyboardKey(keyCode);
-    if (sf::Keyboard::isKeyPressed(sfmlKey))
-    {
-        return InputState::PRESSED;
-    } 
-    else 
-    {
-        return InputState::RELEASED;
-    }
-}
-
-InputState InputView::GetMouseButtonState(MouseButton button)
-{
-    if (sf::Mouse::isButtonPressed(InputView::sfmlMouseButton(button)))
-    {
-        return InputState::PRESSED;
-    }
-    else
-    {
-        return InputState::RELEASED;
-    }
-}
-
-int InputView::GetMouseX()
-{
-    sf::Vector2i position = sf::Mouse::getPosition();
-    return position.x;
-}
-
-int InputView::GetMouseY()
-{
-    sf::Vector2i position = sf::Mouse::getPosition();
-    return position.y;
-}
-
-KeyboardKey InputView::nativeKeyboardKey(sf::Keyboard::Key key)
-{
-    switch (key) {
-        case sf::Keyboard::Key::A:
-            return KeyboardKey::KEYBOARD_A;
-        case sf::Keyboard::Key::B:
-            return KeyboardKey::KEYBOARD_B;
-        case sf::Keyboard::Key::C:
-            return KeyboardKey::KEYBOARD_C;
-        case sf::Keyboard::Key::D:
-            return KeyboardKey::KEYBOARD_D;
-        case sf::Keyboard::Key::E:
-            return KeyboardKey::KEYBOARD_E;
-        case sf::Keyboard::Key::F:
-            return KeyboardKey::KEYBOARD_F;
-        case sf::Keyboard::Key::G:
-            return KeyboardKey::KEYBOARD_G;
-        case sf::Keyboard::Key::H:
-            return KeyboardKey::KEYBOARD_H;
-        case sf::Keyboard::Key::I:
-            return KeyboardKey::KEYBOARD_I;
-        case sf::Keyboard::Key::J:
-            return KeyboardKey::KEYBOARD_J;
-        case sf::Keyboard::Key::K:
-            return KeyboardKey::KEYBOARD_K;
-        case sf::Keyboard::Key::L:
-            return KeyboardKey::KEYBOARD_L;
-        case sf::Keyboard::Key::M:
-            return KeyboardKey::KEYBOARD_M;
-        case sf::Keyboard::Key::N:
-            return KeyboardKey::KEYBOARD_N;
-        case sf::Keyboard::Key::O:
-            return KeyboardKey::KEYBOARD_O;
-        case sf::Keyboard::Key::P:
-            return KeyboardKey::KEYBOARD_P;
-        case sf::Keyboard::Key::Q:
-            return KeyboardKey::KEYBOARD_Q;
-        case sf::Keyboard::Key::R:
-            return KeyboardKey::KEYBOARD_R;
-        case sf::Keyboard::Key::S:
-            return KeyboardKey::KEYBOARD_S;
-        case sf::Keyboard::Key::T:
-            return KeyboardKey::KEYBOARD_T;
-        case sf::Keyboard::Key::U:
-            return KeyboardKey::KEYBOARD_U;
-        case sf::Keyboard::Key::V:
-            return KeyboardKey::KEYBOARD_V;
-        case sf::Keyboard::Key::W:
-            return KeyboardKey::KEYBOARD_W;
-        case sf::Keyboard::Key::X:
-            return KeyboardKey::KEYBOARD_X;
-        case sf::Keyboard::Key::Y:
-            return KeyboardKey::KEYBOARD_Y;
-        case sf::Keyboard::Key::Z:
-            return KeyboardKey::KEYBOARD_Z;
-        case sf::Keyboard::Key::Num1:
-            return KeyboardKey::KEYBOARD_1;
-        case sf::Keyboard::Key::Num2:
-            return KeyboardKey::KEYBOARD_2;
-        case sf::Keyboard::Key::Num3:
-            return KeyboardKey::KEYBOARD_3;
-        case sf::Keyboard::Key::Num4:
-            return KeyboardKey::KEYBOARD_4;
-        case sf::Keyboard::Key::Num5:
-            return KeyboardKey::KEYBOARD_5;
-        case sf::Keyboard::Key::Num6:
-            return KeyboardKey::KEYBOARD_6;
-        case sf::Keyboard::Key::Num7:
-            return KeyboardKey::KEYBOARD_7;
-        case sf::Keyboard::Key::Num8:
-            return KeyboardKey::KEYBOARD_8;
-        case sf::Keyboard::Key::Num9:
-            return KeyboardKey::KEYBOARD_9;
-        case sf::Keyboard::Key::Num0:
-            return KeyboardKey::KEYBOARD_0;
-        case sf::Keyboard::Key::Return:
-            return KeyboardKey::KEYBOARD_ENTER;
-        case sf::Keyboard::Key::Escape:
-            return KeyboardKey::KEYBOARD_ESCAPE;
-        case sf::Keyboard::Key::BackSpace:
-            return KeyboardKey::KEYBOARD_BACKSPACE;
-        case sf::Keyboard::Key::Tab:
-            return KeyboardKey::KEYBOARD_TAB;
-        case sf::Keyboard::Key::Space:
-            return KeyboardKey::KEYBOARD_SPACEBAR;
-        case sf::Keyboard::Key::Dash:
-            return KeyboardKey::KEYBOARD_MINUS;
-        case sf::Keyboard::Key::Equal:
-            return KeyboardKey::KEYBOARD_EQUALS;
-        case sf::Keyboard::Key::LBracket:
-            return KeyboardKey::KEYBOARD_LEFT_BRACKET;
-        case sf::Keyboard::Key::RBracket:
-            return KeyboardKey::KEYBOARD_RIGHT_BRACKET;
-        case sf::Keyboard::Key::BackSlash:
-            return KeyboardKey::KEYBOARD_BACKSLASH;
-        case sf::Keyboard::Key::SemiColon:
-            return KeyboardKey::KEYBOARD_SEMICOLON;
-        case sf::Keyboard::Key::Quote:
-            return KeyboardKey::KEYBOARD_QUOTE;
-        case sf::Keyboard::Key::Tilde:
-            return KeyboardKey::KEYBOARD_GRAVE_ACCENT;
-        case sf::Keyboard::Key::Comma:
-            return KeyboardKey::KEYBOARD_COMMA;
-        case sf::Keyboard::Key::Period:
-            return KeyboardKey::KEYBOARD_PERIOD;
-        case sf::Keyboard::Key::Slash:
-            return KeyboardKey::KEYBOARD_FORWARD_SLASH;
-        case sf::Keyboard::Key::F1:
-            return KeyboardKey::KEYBOARD_F1;
-        case sf::Keyboard::Key::F2:
-            return KeyboardKey::KEYBOARD_F2;
-        case sf::Keyboard::Key::F3:
-            return KeyboardKey::KEYBOARD_F3;
-        case sf::Keyboard::Key::F4:
-            return KeyboardKey::KEYBOARD_F4;
-        case sf::Keyboard::Key::F5:
-            return KeyboardKey::KEYBOARD_F5;
-        case sf::Keyboard::Key::F6:
-            return KeyboardKey::KEYBOARD_F6;
-        case sf::Keyboard::Key::F7:
-            return KeyboardKey::KEYBOARD_F7;
-        case sf::Keyboard::Key::F8:
-            return KeyboardKey::KEYBOARD_F8;
-        case sf::Keyboard::Key::F9:
-            return KeyboardKey::KEYBOARD_F9;
-        case sf::Keyboard::Key::F10:
-            return KeyboardKey::KEYBOARD_F10;
-        case sf::Keyboard::Key::F11:
-            return KeyboardKey::KEYBOARD_F11;
-        case sf::Keyboard::Key::F12:
-            return KeyboardKey::KEYBOARD_F12;
-        case sf::Keyboard::Key::Insert:
-            return KeyboardKey::KEYBOARD_INSERT;
-        case sf::Keyboard::Key::Home:
-            return KeyboardKey::KEYBOARD_HOME;
-        case sf::Keyboard::Key::PageUp:
-            return KeyboardKey::KEYBOARD_PAGE_UP;
-        case sf::Keyboard::Key::Delete:
-            return KeyboardKey::KEYBOARD_DELETE;
-        case sf::Keyboard::Key::End:
-            return KeyboardKey::KEYBOARD_END;
-        case sf::Keyboard::Key::PageDown:
-            return KeyboardKey::KEYBOARD_PAGE_DOWN;
-        case sf::Keyboard::Key::Right:
-            return KeyboardKey::KEYBOARD_RIGHT_ARROW;
-        case sf::Keyboard::Key::Left:
-            return KeyboardKey::KEYBOARD_LEFT_ARROW;
-        case sf::Keyboard::Key::Down:
-            return KeyboardKey::KEYBOARD_DOWN_ARROW;
-        case sf::Keyboard::Key::Up:
-            return KeyboardKey::KEYBOARD_UP_ARROW;
-        case sf::Keyboard::Key::Divide:
-            return KeyboardKey::KEYBOARD_NUM_FORWARD_SLASH;
-        case sf::Keyboard::Key::Multiply:
-            return KeyboardKey::KEYBOARD_NUM_ASTERISK;
-        case sf::Keyboard::Key::Subtract:
-            return KeyboardKey::KEYBOARD_NUM_MINUS;
-        case sf::Keyboard::Key::Add:
-            return KeyboardKey::KEYBOARD_NUM_PLUS;
-        case sf::Keyboard::Key::Numpad1:
-            return KeyboardKey::KEYBOARD_NUM_1;
-        case sf::Keyboard::Key::Numpad2:
-            return KeyboardKey::KEYBOARD_NUM_2;
-        case sf::Keyboard::Key::Numpad3:
-            return KeyboardKey::KEYBOARD_NUM_3;
-        case sf::Keyboard::Key::Numpad4:
-            return KeyboardKey::KEYBOARD_NUM_3;
-        case sf::Keyboard::Key::Numpad5:
-            return KeyboardKey::KEYBOARD_NUM_5;
-        case sf::Keyboard::Key::Numpad6:
-            return KeyboardKey::KEYBOARD_NUM_6;
-        case sf::Keyboard::Key::Numpad7:
-            return KeyboardKey::KEYBOARD_NUM_7;
-        case sf::Keyboard::Key::Numpad8:
-            return KeyboardKey::KEYBOARD_NUM_8;
-        case sf::Keyboard::Key::Numpad9:
-            return KeyboardKey::KEYBOARD_NUM_9;
-        case sf::Keyboard::Key::Numpad0:
-            return KeyboardKey::KEYBOARD_NUM_0;
-        case sf::Keyboard::Key::LControl:
-            return KeyboardKey::KEYBOARD_LEFT_CONTROL;
-        case sf::Keyboard::Key::LShift:
-            return KeyboardKey::KEYBOARD_LEFT_SHIFT;
-        case sf::Keyboard::Key::LAlt:
-            return KeyboardKey::KEYBOARD_LEFT_ALT;
-        case sf::Keyboard::Key::LSystem:
-            return KeyboardKey::KEYBOARD_LEFT_SUPER;
-        case sf::Keyboard::Key::RControl:
-            return KeyboardKey::KEYBOARD_RIGHT_CONTROL;
-        case sf::Keyboard::Key::RShift:
-            return KeyboardKey::KEYBOARD_RIGHT_SHIFT;
-        case sf::Keyboard::Key::RAlt:
-            return KeyboardKey::KEYBOARD_RIGHT_ALT;
-        case sf::Keyboard::Key::RSystem:
-            return KeyboardKey::KEYBOARD_RIGHT_SUPER;
-        case sf::Keyboard::Key::Unknown:
-            return KeyboardKey::KEYBOARD_UNKNOWN;
+    switch (glfwKeyState) {
+        case GLFW_RELEASE:
+            return InputState::RELEASED;
+        case GLFW_PRESS:
+            return InputState::PRESSED;
+        case GLFW_REPEAT:
+            return InputState::PRESSED;
         default:
-            return KeyboardKey::KEYBOARD_UNKNOWN;
+            return InputState::INVALID;
     }
 }
 
-sf::Keyboard::Key InputView::sfmlKeyboardKey(KeyboardKey key) 
+KeyCode InputView::keyCode(int glfwKeyCode)
 {
-    switch (key) {
-        case KeyboardKey::KEYBOARD_A:
-            return sf::Keyboard::Key::A;
-        case KeyboardKey::KEYBOARD_B:
-            return sf::Keyboard::Key::B;
-        case KeyboardKey::KEYBOARD_C:
-            return sf::Keyboard::Key::C;
-        case KeyboardKey::KEYBOARD_D:
-            return sf::Keyboard::Key::D;
-        case KeyboardKey::KEYBOARD_E:
-            return sf::Keyboard::Key::E;
-        case KeyboardKey::KEYBOARD_F:
-            return sf::Keyboard::Key::F;
-        case KeyboardKey::KEYBOARD_G:
-            return sf::Keyboard::Key::G;
-        case KeyboardKey::KEYBOARD_H:
-            return sf::Keyboard::Key::H;
-        case KeyboardKey::KEYBOARD_I:
-            return sf::Keyboard::Key::I;
-        case KeyboardKey::KEYBOARD_J:
-            return sf::Keyboard::Key::J;
-        case KeyboardKey::KEYBOARD_K:
-            return sf::Keyboard::Key::K;
-        case KeyboardKey::KEYBOARD_L:
-            return sf::Keyboard::Key::L;
-        case KeyboardKey::KEYBOARD_M:
-            return sf::Keyboard::Key::M;
-        case KeyboardKey::KEYBOARD_N:
-            return sf::Keyboard::Key::N;
-        case KeyboardKey::KEYBOARD_O:
-            return sf::Keyboard::Key::O;
-        case KeyboardKey::KEYBOARD_P:
-            return sf::Keyboard::Key::P;
-        case KeyboardKey::KEYBOARD_Q:
-            return sf::Keyboard::Key::Q;
-        case KeyboardKey::KEYBOARD_R:
-            return sf::Keyboard::Key::R;
-        case KeyboardKey::KEYBOARD_S:
-            return sf::Keyboard::Key::S;
-        case KeyboardKey::KEYBOARD_T:
-            return sf::Keyboard::Key::T;
-        case KeyboardKey::KEYBOARD_U:
-            return sf::Keyboard::Key::U;
-        case KeyboardKey::KEYBOARD_V:
-            return sf::Keyboard::Key::V;
-        case KeyboardKey::KEYBOARD_W:
-            return sf::Keyboard::Key::W;
-        case KeyboardKey::KEYBOARD_X:
-            return sf::Keyboard::Key::X;
-        case KeyboardKey::KEYBOARD_Y:
-            return sf::Keyboard::Key::Y;
-        case KeyboardKey::KEYBOARD_Z:
-            return sf::Keyboard::Key::Z;
-        case KeyboardKey::KEYBOARD_1:
-            return sf::Keyboard::Key::Num1;
-        case KeyboardKey::KEYBOARD_2:
-            return sf::Keyboard::Key::Num2;
-        case KeyboardKey::KEYBOARD_3:
-            return sf::Keyboard::Key::Num3;
-        case KeyboardKey::KEYBOARD_4:
-            return sf::Keyboard::Key::Num4;
-        case KeyboardKey::KEYBOARD_5:
-            return sf::Keyboard::Key::Num5;
-        case KeyboardKey::KEYBOARD_6:
-            return sf::Keyboard::Key::Num6;
-        case KeyboardKey::KEYBOARD_7:
-            return sf::Keyboard::Key::Num7;
-        case KeyboardKey::KEYBOARD_8:
-            return sf::Keyboard::Key::Num8;
-        case KeyboardKey::KEYBOARD_9:
-            return sf::Keyboard::Key::Num9;
-        case KeyboardKey::KEYBOARD_0:
-            return sf::Keyboard::Key::Num0;
-        case KeyboardKey::KEYBOARD_ENTER:
-            return sf::Keyboard::Key::Return;
-        case KeyboardKey::KEYBOARD_ESCAPE:
-            return sf::Keyboard::Key::Escape;
-        case KeyboardKey::KEYBOARD_BACKSPACE:
-            return sf::Keyboard::Key::BackSpace;
-        case KeyboardKey::KEYBOARD_TAB:
-            return sf::Keyboard::Key::Tab;
-        case KeyboardKey::KEYBOARD_SPACEBAR:
-            return sf::Keyboard::Key::Space;
-        case KeyboardKey::KEYBOARD_MINUS:
-            return sf::Keyboard::Key::Dash;
-        case KeyboardKey::KEYBOARD_EQUALS:
-            return sf::Keyboard::Key::Equal;
-        case KeyboardKey::KEYBOARD_LEFT_BRACKET:
-            return sf::Keyboard::Key::LBracket;
-        case KeyboardKey::KEYBOARD_RIGHT_BRACKET:
-            return sf::Keyboard::Key::RBracket;
-        case KeyboardKey::KEYBOARD_BACKSLASH:
-            return sf::Keyboard::Key::BackSlash;
-        case KeyboardKey::KEYBOARD_SEMICOLON:
-            return sf::Keyboard::Key::SemiColon;
-        case KeyboardKey::KEYBOARD_QUOTE:
-            return sf::Keyboard::Key::Quote;
-        case KeyboardKey::KEYBOARD_GRAVE_ACCENT:
-            return sf::Keyboard::Key::Tilde;
-        case KeyboardKey::KEYBOARD_COMMA:
-            return sf::Keyboard::Key::Comma;
-        case KeyboardKey::KEYBOARD_PERIOD:
-            return sf::Keyboard::Key::Period;
-        case KeyboardKey::KEYBOARD_FORWARD_SLASH:
-            return sf::Keyboard::Key::Slash;
-        case KeyboardKey::KEYBOARD_F1:
-            return sf::Keyboard::Key::F1;
-        case KeyboardKey::KEYBOARD_F2:
-            return sf::Keyboard::Key::F2;
-        case KeyboardKey::KEYBOARD_F3:
-            return sf::Keyboard::Key::F3;
-        case KeyboardKey::KEYBOARD_F4:
-            return sf::Keyboard::Key::F4;
-        case KeyboardKey::KEYBOARD_F5:
-            return sf::Keyboard::Key::F5;
-        case KeyboardKey::KEYBOARD_F6:
-            return sf::Keyboard::Key::F6;
-        case KeyboardKey::KEYBOARD_F7:
-            return sf::Keyboard::Key::F7;
-        case KeyboardKey::KEYBOARD_F8:
-            return sf::Keyboard::Key::F8;
-        case KeyboardKey::KEYBOARD_F9:
-            return sf::Keyboard::Key::F9;
-        case KeyboardKey::KEYBOARD_F10:
-            return sf::Keyboard::Key::F10;
-        case KeyboardKey::KEYBOARD_F11:
-            return sf::Keyboard::Key::F11;
-        case KeyboardKey::KEYBOARD_F12:
-            return sf::Keyboard::Key::F12;
-        case KeyboardKey::KEYBOARD_INSERT:
-            return sf::Keyboard::Key::Insert;
-        case KeyboardKey::KEYBOARD_HOME:
-            return sf::Keyboard::Key::Home;
-        case KeyboardKey::KEYBOARD_PAGE_UP:
-            return sf::Keyboard::Key::PageUp;
-        case KeyboardKey::KEYBOARD_DELETE:
-            return sf::Keyboard::Key::Delete;
-        case KeyboardKey::KEYBOARD_END:
-            return sf::Keyboard::Key::End;
-        case KeyboardKey::KEYBOARD_PAGE_DOWN:
-            return sf::Keyboard::Key::PageDown;
-        case KeyboardKey::KEYBOARD_RIGHT_ARROW:
-            return sf::Keyboard::Key::Right;
-        case KeyboardKey::KEYBOARD_LEFT_ARROW:
-            return sf::Keyboard::Key::Left;
-        case KeyboardKey::KEYBOARD_DOWN_ARROW:
-            return sf::Keyboard::Key::Down;
-        case KeyboardKey::KEYBOARD_UP_ARROW:
-            return sf::Keyboard::Key::Up;
-        case KeyboardKey::KEYBOARD_NUM_FORWARD_SLASH:
-            return sf::Keyboard::Key::Divide;
-        case KeyboardKey::KEYBOARD_NUM_ASTERISK:
-            return sf::Keyboard::Key::Multiply;
-        case KeyboardKey::KEYBOARD_NUM_MINUS:
-            return sf::Keyboard::Key::Subtract;
-        case KeyboardKey::KEYBOARD_NUM_PLUS:
-            return sf::Keyboard::Key::Add;
-        case KeyboardKey::KEYBOARD_NUM_1:
-            return sf::Keyboard::Key::Numpad1;
-        case KeyboardKey::KEYBOARD_NUM_2:
-            return sf::Keyboard::Key::Numpad2;
-        case KeyboardKey::KEYBOARD_NUM_3:
-            return sf::Keyboard::Key::Numpad3;
-        case KeyboardKey::KEYBOARD_NUM_4:
-            return sf::Keyboard::Key::Numpad4;
-        case KeyboardKey::KEYBOARD_NUM_5:
-            return sf::Keyboard::Key::Numpad5;
-        case KeyboardKey::KEYBOARD_NUM_6:
-            return sf::Keyboard::Key::Numpad6;
-        case KeyboardKey::KEYBOARD_NUM_7:
-            return sf::Keyboard::Key::Numpad7;
-        case KeyboardKey::KEYBOARD_NUM_8:
-            return sf::Keyboard::Key::Numpad8;
-        case KeyboardKey::KEYBOARD_NUM_9:
-            return sf::Keyboard::Key::Numpad9;
-        case KeyboardKey::KEYBOARD_NUM_0:
-            return sf::Keyboard::Key::Numpad0;
-        case KeyboardKey::KEYBOARD_LEFT_CONTROL:
-            return sf::Keyboard::Key::LControl;
-        case KeyboardKey::KEYBOARD_LEFT_SHIFT:
-            return sf::Keyboard::Key::LShift;
-        case KeyboardKey::KEYBOARD_LEFT_ALT:
-            return sf::Keyboard::Key::LAlt;
-        case KeyboardKey::KEYBOARD_LEFT_SUPER:
-            return sf::Keyboard::Key::LSystem;
-        case KeyboardKey::KEYBOARD_RIGHT_CONTROL:
-            return sf::Keyboard::Key::RControl;
-        case KeyboardKey::KEYBOARD_RIGHT_SHIFT:
-            return sf::Keyboard::Key::RShift;
-        case KeyboardKey::KEYBOARD_RIGHT_ALT:
-            return sf::Keyboard::Key::RAlt;
-        case KeyboardKey::KEYBOARD_RIGHT_SUPER:
-            return sf::Keyboard::Key::RSystem;
-        default:
-            // undefined behavior
-            return sf::Keyboard::Key::Unknown;
-    }
+	switch (glfwKeyCode) {
+		case GLFW_KEY_A:
+		    return KeyCode::KEYBOARD_A;
+		case GLFW_KEY_B:
+		    return KeyCode::KEYBOARD_B;
+		case GLFW_KEY_C:
+		    return KeyCode::KEYBOARD_C;
+		case GLFW_KEY_D:
+		    return KeyCode::KEYBOARD_D;
+		case GLFW_KEY_E:
+		    return KeyCode::KEYBOARD_E;
+		case GLFW_KEY_F:
+		    return KeyCode::KEYBOARD_F;
+		case GLFW_KEY_G:
+		    return KeyCode::KEYBOARD_G;
+		case GLFW_KEY_H:
+		    return KeyCode::KEYBOARD_H;
+		case GLFW_KEY_I:
+	    	return KeyCode::KEYBOARD_I;
+		case GLFW_KEY_J:
+	    	return KeyCode::KEYBOARD_J;
+		case GLFW_KEY_K:
+	    	return KeyCode::KEYBOARD_K;
+		case GLFW_KEY_L:
+	    	return KeyCode::KEYBOARD_L;
+		case GLFW_KEY_M:
+	    	return KeyCode::KEYBOARD_M;
+		case GLFW_KEY_N:
+	    	return KeyCode::KEYBOARD_N;
+		case GLFW_KEY_O:
+	    	return KeyCode::KEYBOARD_O;
+		case GLFW_KEY_P:
+	    	return KeyCode::KEYBOARD_P;
+		case GLFW_KEY_Q:
+	    	return KeyCode::KEYBOARD_Q;
+		case GLFW_KEY_R:
+	    	return KeyCode::KEYBOARD_R;
+		case GLFW_KEY_S:
+	    	return KeyCode::KEYBOARD_S;
+		case GLFW_KEY_T:
+	    	return KeyCode::KEYBOARD_T;
+		case GLFW_KEY_U:
+	    	return KeyCode::KEYBOARD_U;
+		case GLFW_KEY_V:
+	    	return KeyCode::KEYBOARD_V;
+		case GLFW_KEY_W:
+	    	return KeyCode::KEYBOARD_W;
+		case GLFW_KEY_X:
+	    	return KeyCode::KEYBOARD_X;
+		case GLFW_KEY_Y:
+	    	return KeyCode::KEYBOARD_Y;
+		case GLFW_KEY_Z:
+	    	return KeyCode::KEYBOARD_Z;
+		case GLFW_KEY_1:
+	    	return KeyCode::KEYBOARD_1;
+		case GLFW_KEY_2:
+	    	return KeyCode::KEYBOARD_2;
+		case GLFW_KEY_3:
+	    	return KeyCode::KEYBOARD_3;
+		case GLFW_KEY_4:
+	    	return KeyCode::KEYBOARD_4;
+		case GLFW_KEY_5:
+	    	return KeyCode::KEYBOARD_5;
+		case GLFW_KEY_6:
+	    	return KeyCode::KEYBOARD_6;
+		case GLFW_KEY_7:
+	    	return KeyCode::KEYBOARD_7;
+		case GLFW_KEY_8:
+	    	return KeyCode::KEYBOARD_8;
+		case GLFW_KEY_9:
+	    	return KeyCode::KEYBOARD_9;
+		case GLFW_KEY_0:
+	    	return KeyCode::KEYBOARD_0;
+		case GLFW_KEY_ENTER:
+	    	return KeyCode::KEYBOARD_ENTER;
+		case GLFW_KEY_ESCAPE:
+	    	return KeyCode::KEYBOARD_ESCAPE;
+		case GLFW_KEY_BACKSPACE:
+	    	return KeyCode::KEYBOARD_BACKSPACE;
+		case GLFW_KEY_TAB:
+	    	return KeyCode::KEYBOARD_TAB;
+		case GLFW_KEY_SPACE:
+		    return KeyCode::KEYBOARD_SPACEBAR;
+		case GLFW_KEY_MINUS:
+    		return KeyCode::KEYBOARD_MINUS;
+		case GLFW_KEY_EQUAL:
+	    	return KeyCode::KEYBOARD_EQUALS;
+		case GLFW_KEY_LEFT_BRACKET:
+	    	return KeyCode::KEYBOARD_LEFT_BRACKET;
+		case GLFW_KEY_RIGHT_BRACKET:
+	    	return KeyCode::KEYBOARD_RIGHT_BRACKET;
+		case GLFW_KEY_BACKSLASH:
+    		return KeyCode::KEYBOARD_BACKSLASH;
+		case GLFW_KEY_SEMICOLON:
+    		return KeyCode::KEYBOARD_SEMICOLON;
+		case GLFW_KEY_APOSTROPHE:
+    		return KeyCode::KEYBOARD_QUOTE;
+		case GLFW_KEY_GRAVE_ACCENT:
+    		return KeyCode::KEYBOARD_GRAVE_ACCENT;
+		case GLFW_KEY_COMMA:
+    		return KeyCode::KEYBOARD_COMMA;
+		case GLFW_KEY_PERIOD:
+    		return KeyCode::KEYBOARD_PERIOD;
+		case GLFW_KEY_SLASH:
+    		return KeyCode::KEYBOARD_FORWARD_SLASH;
+		case GLFW_KEY_CAPS_LOCK:
+    		return KeyCode::KEYBOARD_CAPS_LOCK;
+		case GLFW_KEY_F1:
+    		return KeyCode::KEYBOARD_F1;
+		case GLFW_KEY_F2:
+	    	return KeyCode::KEYBOARD_F2;
+		case GLFW_KEY_F3:
+    		return KeyCode::KEYBOARD_F3;
+		case GLFW_KEY_F4:
+	    	return KeyCode::KEYBOARD_F4;
+		case GLFW_KEY_F5:
+	    	return KeyCode::KEYBOARD_F5;
+		case GLFW_KEY_F6:
+	    	return KeyCode::KEYBOARD_F6;
+		case GLFW_KEY_F7:
+	    	return KeyCode::KEYBOARD_F7;
+		case GLFW_KEY_F8:
+	    	return KeyCode::KEYBOARD_F8;
+		case GLFW_KEY_F9:
+	    	return KeyCode::KEYBOARD_F9;
+		case GLFW_KEY_F10:
+	    	return KeyCode::KEYBOARD_F10;
+		case GLFW_KEY_F11:
+    		return KeyCode::KEYBOARD_F11;
+		case GLFW_KEY_F12:
+    		return KeyCode::KEYBOARD_F12;
+		case GLFW_KEY_PRINT_SCREEN:
+    		return KeyCode::KEYBOARD_PRINT_SCREEN;
+		case GLFW_KEY_SCROLL_LOCK:
+    		return KeyCode::KEYBOARD_SCROLL_LOCK;
+		case GLFW_KEY_PAUSE:
+    		return KeyCode::KEYBOARD_PAUSE;
+		case GLFW_KEY_INSERT:
+    		return KeyCode::KEYBOARD_INSERT;
+		case GLFW_KEY_HOME:
+    		return KeyCode::KEYBOARD_HOME;
+		case GLFW_KEY_PAGE_UP:
+	    	return KeyCode::KEYBOARD_PAGE_UP;
+		case GLFW_KEY_DELETE:
+	    	return KeyCode::KEYBOARD_DELETE;
+		case GLFW_KEY_END:
+    		return KeyCode::KEYBOARD_END;
+		case GLFW_KEY_PAGE_DOWN:
+    		return KeyCode::KEYBOARD_PAGE_DOWN;
+		case GLFW_KEY_RIGHT:
+    		return KeyCode::KEYBOARD_RIGHT_ARROW;
+		case GLFW_KEY_LEFT:
+    		return KeyCode::KEYBOARD_LEFT_ARROW;
+		case GLFW_KEY_DOWN:
+    		return KeyCode::KEYBOARD_DOWN_ARROW;
+		case GLFW_KEY_UP:
+    		return KeyCode::KEYBOARD_UP_ARROW;
+		case GLFW_KEY_NUM_LOCK:
+    		return KeyCode::KEYBOARD_NUM_LOCK;
+		case GLFW_KEY_KP_DIVIDE:
+    		return KeyCode::KEYBOARD_NUM_FORWARD_SLASH;
+		case GLFW_KEY_KP_MULTIPLY:
+	    	return KeyCode::KEYBOARD_NUM_ASTERISK;
+    	case GLFW_KEY_KP_SUBTRACT:
+    		return KeyCode::KEYBOARD_NUM_MINUS;
+		case GLFW_KEY_KP_ADD:
+    		return KeyCode::KEYBOARD_NUM_PLUS;
+		case GLFW_KEY_KP_ENTER:
+    		return KeyCode::KEYBOARD_NUM_ENTER;
+		case GLFW_KEY_KP_1:
+    		return KeyCode::KEYBOARD_NUM_1;
+		case GLFW_KEY_KP_2:
+    		return KeyCode::KEYBOARD_NUM_2;
+		case GLFW_KEY_KP_3:
+    		return KeyCode::KEYBOARD_NUM_3;
+		case GLFW_KEY_KP_4:
+    		return KeyCode::KEYBOARD_NUM_4;
+		case GLFW_KEY_KP_5:
+    		return KeyCode::KEYBOARD_NUM_5;
+		case GLFW_KEY_KP_6:
+	    	return KeyCode::KEYBOARD_NUM_6;
+    	case GLFW_KEY_KP_7:
+	    	return KeyCode::KEYBOARD_NUM_7;
+		case GLFW_KEY_KP_8:
+	    	return KeyCode::KEYBOARD_NUM_8;
+		case GLFW_KEY_KP_9:
+	    	return KeyCode::KEYBOARD_NUM_9;
+		case GLFW_KEY_KP_0:
+	    	return KeyCode::KEYBOARD_NUM_0;
+		case GLFW_KEY_KP_DECIMAL:
+	    	return KeyCode::KEYBOARD_NUM_PERIOD;
+		case GLFW_KEY_KP_EQUAL:
+	    	return KeyCode::KEYBOARD_NUM_EQUALS;
+		case GLFW_KEY_LEFT_CONTROL:
+	    	return KeyCode::KEYBOARD_LEFT_CONTROL;
+		case GLFW_KEY_LEFT_SHIFT:
+	    	return KeyCode::KEYBOARD_LEFT_SHIFT;
+		case GLFW_KEY_LEFT_ALT:
+	    	return KeyCode::KEYBOARD_LEFT_ALT;
+		case GLFW_KEY_LEFT_SUPER:
+	    	return KeyCode::KEYBOARD_LEFT_SUPER;
+		case GLFW_KEY_RIGHT_CONTROL:
+	    	return KeyCode::KEYBOARD_RIGHT_CONTROL;
+		case GLFW_KEY_RIGHT_SHIFT:
+	    	return KeyCode::KEYBOARD_RIGHT_SHIFT;
+		case GLFW_KEY_RIGHT_ALT:
+	    	return KeyCode::KEYBOARD_RIGHT_ALT;
+		case GLFW_KEY_RIGHT_SUPER:
+	    	return KeyCode::KEYBOARD_RIGHT_SUPER;
+		case GLFW_KEY_UNKNOWN:
+	    	return KeyCode::KEYBOARD_UNKNOWN;
+		default:
+	    	return KeyCode::KEYBOARD_UNKNOWN;
+	}
 }
 
-MouseButton InputView::nativeMouseButton(sf::Mouse::Button button)
+int InputView::glfwKeyCode(KeyCode keyCode) 
 {
-    switch(button)
-    {
-        case sf::Mouse::Left:
-            return MouseButton::MOUSE_1;
-        case sf::Mouse::Right:
-            return MouseButton::MOUSE_2;
-        case sf::Mouse::Middle:
-            return MouseButton::MOUSE_3;
-        case sf::Mouse::XButton1:
-            return MouseButton::MOUSE_4;
-        case sf::Mouse::XButton2:
-            return MouseButton::MOUSE_5;
-        default:
-            // undefined behavior
-            assert(false);
-    }
-}
-
-sf::Mouse::Button InputView::sfmlMouseButton(MouseButton button)
-{
-    switch(button)
-    {
-        case MouseButton::MOUSE_1:
-            return sf::Mouse::Left;
-        case MouseButton::MOUSE_2:
-            return sf::Mouse::Right;
-        case MouseButton::MOUSE_3:
-            return sf::Mouse::Middle;
-        case MouseButton::MOUSE_4:
-            return sf::Mouse::XButton1;
-        case MouseButton::MOUSE_5:
-            return sf::Mouse::XButton2;
-        default:
-            // undefined behavior
-            assert(false);
-    }
+	switch (keyCode) {
+		case KeyCode::KEYBOARD_A:
+    		return GLFW_KEY_A;
+		case KeyCode::KEYBOARD_B:
+    		return GLFW_KEY_B;
+		case KeyCode::KEYBOARD_C:
+    		return GLFW_KEY_C;
+		case KeyCode::KEYBOARD_D:
+	    	return GLFW_KEY_D;
+		case KeyCode::KEYBOARD_E:
+	    	return GLFW_KEY_E;
+		case KeyCode::KEYBOARD_F:
+	    	return GLFW_KEY_F;
+		case KeyCode::KEYBOARD_G:
+	    	return GLFW_KEY_G;
+		case KeyCode::KEYBOARD_H:
+	    	return GLFW_KEY_H;
+		case KeyCode::KEYBOARD_I:
+    		return GLFW_KEY_I;
+		case KeyCode::KEYBOARD_J:
+    		return GLFW_KEY_J;
+		case KeyCode::KEYBOARD_K:
+    		return GLFW_KEY_K;
+		case KeyCode::KEYBOARD_L:
+    		return GLFW_KEY_L;
+		case KeyCode::KEYBOARD_M:
+    		return GLFW_KEY_M;
+		case KeyCode::KEYBOARD_N:
+	    	return GLFW_KEY_N;
+		case KeyCode::KEYBOARD_O:
+    		return GLFW_KEY_O;
+		case KeyCode::KEYBOARD_P:
+    		return GLFW_KEY_P;
+		case KeyCode::KEYBOARD_Q:
+    		return GLFW_KEY_Q;
+		case KeyCode::KEYBOARD_R:
+    		return GLFW_KEY_R;
+		case KeyCode::KEYBOARD_S:
+    		return GLFW_KEY_S;
+		case KeyCode::KEYBOARD_T:
+    		return GLFW_KEY_T;
+		case KeyCode::KEYBOARD_U:
+    		return GLFW_KEY_U;
+		case KeyCode::KEYBOARD_V:
+    		return GLFW_KEY_V;
+		case KeyCode::KEYBOARD_W:
+    		return GLFW_KEY_W;
+		case KeyCode::KEYBOARD_X:
+    		return GLFW_KEY_X;
+   		case KeyCode::KEYBOARD_Y:
+    		return GLFW_KEY_Y;
+   		case KeyCode::KEYBOARD_Z:
+		    return GLFW_KEY_Z;
+		case KeyCode::KEYBOARD_1:
+	    	return GLFW_KEY_1;
+		case KeyCode::KEYBOARD_2:
+	    	return GLFW_KEY_2;
+		case KeyCode::KEYBOARD_3:
+	    	return GLFW_KEY_3;
+		case KeyCode::KEYBOARD_4:
+	    	return GLFW_KEY_4;
+		case KeyCode::KEYBOARD_5:
+	    	return GLFW_KEY_5;
+		case KeyCode::KEYBOARD_6:
+	    	return GLFW_KEY_6;
+		case KeyCode::KEYBOARD_7:
+	    	return GLFW_KEY_7;
+		case KeyCode::KEYBOARD_8:
+	    	return GLFW_KEY_8;
+		case KeyCode::KEYBOARD_9:
+	    	return GLFW_KEY_9;
+		case KeyCode::KEYBOARD_0:
+	    	return GLFW_KEY_0;
+		case KeyCode::KEYBOARD_ENTER:
+	    	return GLFW_KEY_ENTER;
+		case KeyCode::KEYBOARD_ESCAPE:
+	    	return GLFW_KEY_ESCAPE;
+		case KeyCode::KEYBOARD_BACKSPACE:
+	    	return GLFW_KEY_BACKSPACE;
+		case KeyCode::KEYBOARD_TAB:
+	    	return GLFW_KEY_TAB;
+		case KeyCode::KEYBOARD_SPACEBAR:
+	    	return GLFW_KEY_SPACE;
+		case KeyCode::KEYBOARD_MINUS:
+	    	return GLFW_KEY_MINUS;
+		case KeyCode::KEYBOARD_EQUALS:
+	    	return GLFW_KEY_EQUAL;
+		case KeyCode::KEYBOARD_LEFT_BRACKET:
+	    	return GLFW_KEY_LEFT_BRACKET;
+		case KeyCode::KEYBOARD_RIGHT_BRACKET:
+	    	return GLFW_KEY_RIGHT_BRACKET;
+		case KeyCode::KEYBOARD_BACKSLASH:
+	    	return GLFW_KEY_BACKSLASH;
+		case KeyCode::KEYBOARD_SEMICOLON:
+	    	return GLFW_KEY_SEMICOLON;
+		case KeyCode::KEYBOARD_QUOTE:
+	    	return GLFW_KEY_APOSTROPHE;
+		case KeyCode::KEYBOARD_GRAVE_ACCENT:
+	    	return GLFW_KEY_GRAVE_ACCENT;
+		case KeyCode::KEYBOARD_COMMA:
+	    	return GLFW_KEY_COMMA;
+		case KeyCode::KEYBOARD_PERIOD:
+	    	return GLFW_KEY_PERIOD;
+		case KeyCode::KEYBOARD_FORWARD_SLASH:
+	    	return GLFW_KEY_SLASH;
+		case KeyCode::KEYBOARD_CAPS_LOCK:
+	    	return GLFW_KEY_CAPS_LOCK;
+		case KeyCode::KEYBOARD_F1:
+	    	return GLFW_KEY_F1;
+		case KeyCode::KEYBOARD_F2:
+	    	return GLFW_KEY_F2;
+		case KeyCode::KEYBOARD_F3:
+	    	return GLFW_KEY_F3;
+		case KeyCode::KEYBOARD_F4:
+	    	return GLFW_KEY_F4;
+		case KeyCode::KEYBOARD_F5:
+	    	return GLFW_KEY_F5;
+		case KeyCode::KEYBOARD_F6:
+	    	return GLFW_KEY_F6;
+		case KeyCode::KEYBOARD_F7:
+	    	return GLFW_KEY_F7;
+		case KeyCode::KEYBOARD_F8:
+	    	return GLFW_KEY_F8;
+		case KeyCode::KEYBOARD_F9:
+	    	return GLFW_KEY_F9;
+		case KeyCode::KEYBOARD_F10:
+	    	return GLFW_KEY_F10;
+		case KeyCode::KEYBOARD_F11:
+	    	return GLFW_KEY_F11;
+		case KeyCode::KEYBOARD_F12:
+	    	return GLFW_KEY_F12;
+		case KeyCode::KEYBOARD_PRINT_SCREEN:
+	    	return GLFW_KEY_PRINT_SCREEN;
+		case KeyCode::KEYBOARD_SCROLL_LOCK:
+	    	return GLFW_KEY_SCROLL_LOCK;
+		case KeyCode::KEYBOARD_PAUSE:
+	    	return GLFW_KEY_PAUSE;
+		case KeyCode::KEYBOARD_INSERT:
+	    	return GLFW_KEY_INSERT;
+		case KeyCode::KEYBOARD_HOME:
+	    	return GLFW_KEY_HOME;
+		case KeyCode::KEYBOARD_PAGE_UP:
+	    	return GLFW_KEY_PAGE_UP;
+		case KeyCode::KEYBOARD_DELETE:
+	    	return GLFW_KEY_DELETE;
+		case KeyCode::KEYBOARD_END:
+	    	return GLFW_KEY_END;
+		case KeyCode::KEYBOARD_PAGE_DOWN:
+	    	return GLFW_KEY_PAGE_DOWN;
+		case KeyCode::KEYBOARD_RIGHT_ARROW:
+	    	return GLFW_KEY_RIGHT;
+		case KeyCode::KEYBOARD_LEFT_ARROW:
+	    	return GLFW_KEY_LEFT;
+		case KeyCode::KEYBOARD_DOWN_ARROW:
+	    	return GLFW_KEY_DOWN;
+		case KeyCode::KEYBOARD_UP_ARROW:
+	    	return GLFW_KEY_UP;
+		case KeyCode::KEYBOARD_NUM_LOCK:
+	    	return GLFW_KEY_NUM_LOCK;
+		case KeyCode::KEYBOARD_NUM_FORWARD_SLASH:
+	    	return GLFW_KEY_KP_DIVIDE;
+		case KeyCode::KEYBOARD_NUM_ASTERISK:
+	    	return GLFW_KEY_KP_MULTIPLY;
+		case KeyCode::KEYBOARD_NUM_MINUS:
+	    	return GLFW_KEY_KP_SUBTRACT;
+		case KeyCode::KEYBOARD_NUM_PLUS:
+	    	return GLFW_KEY_KP_ADD;
+		case KeyCode::KEYBOARD_NUM_ENTER:
+	    	return GLFW_KEY_KP_ENTER;
+		case KeyCode::KEYBOARD_NUM_1:
+	    	return GLFW_KEY_KP_1;
+		case KeyCode::KEYBOARD_NUM_2:
+	    	return GLFW_KEY_KP_2;
+		case KeyCode::KEYBOARD_NUM_3:
+	    	return GLFW_KEY_KP_3;
+		case KeyCode::KEYBOARD_NUM_4:
+	    	return GLFW_KEY_KP_4;
+		case KeyCode::KEYBOARD_NUM_5:
+	    	return GLFW_KEY_KP_5;
+		case KeyCode::KEYBOARD_NUM_6:
+	    	return GLFW_KEY_KP_6;
+		case KeyCode::KEYBOARD_NUM_7:
+	    	return GLFW_KEY_KP_7;
+		case KeyCode::KEYBOARD_NUM_8:
+	       	return GLFW_KEY_KP_8;
+		case KeyCode::KEYBOARD_NUM_9:
+	     	return GLFW_KEY_KP_9;
+		case KeyCode::KEYBOARD_NUM_0:
+	     	return GLFW_KEY_KP_0;
+		case KeyCode::KEYBOARD_NUM_PERIOD:
+	     	return GLFW_KEY_KP_DECIMAL;
+		case KeyCode::KEYBOARD_NUM_EQUALS:
+	     	return GLFW_KEY_KP_EQUAL;
+		case KeyCode::KEYBOARD_LEFT_CONTROL:
+	     	return GLFW_KEY_LEFT_CONTROL;
+		case KeyCode::KEYBOARD_LEFT_SHIFT:
+	     	return GLFW_KEY_LEFT_SHIFT;
+		case KeyCode::KEYBOARD_LEFT_ALT:
+	     	return GLFW_KEY_LEFT_ALT;
+		case KeyCode::KEYBOARD_LEFT_SUPER:
+	     	return GLFW_KEY_LEFT_SUPER;
+		case KeyCode::KEYBOARD_RIGHT_CONTROL:
+	     	return GLFW_KEY_RIGHT_CONTROL;
+		case KeyCode::KEYBOARD_RIGHT_SHIFT:
+	     	return GLFW_KEY_RIGHT_SHIFT;
+		case KeyCode::KEYBOARD_RIGHT_ALT:
+	     	return GLFW_KEY_RIGHT_ALT;
+		case KeyCode::KEYBOARD_RIGHT_SUPER:
+	     	return GLFW_KEY_RIGHT_SUPER;
+		case KeyCode::KEYBOARD_UNKNOWN:
+	     	return GLFW_KEY_UNKNOWN;
+		default:
+		   return GLFW_KEY_UNKNOWN;
+	}
 }

@@ -4,12 +4,9 @@
 #include <set>
 #include <iterator>
 #include <mutex>
-#include <memory>
 #include "Color.h"
-#include "Camera.h"
 
 class Sprite;
-enum class SpriteRenderMode;
 
 /**
  * Manages all graphical work provided by the engine.  Current functionality:
@@ -33,84 +30,76 @@ public:
      */
     GraphicsManager();
 
-    /**
-     * Destructor
-     */
-    ~GraphicsManager();
+	/**
+	 * Destructor
+	 */
+	~GraphicsManager();
 
-    /**
-     * Gets the clear color
-     */
-    Color GetClearColor();
+	/**
+	 * Gets the clear color
+	 */
+	Color GetClearColor();
+	
+	/**
+	 * Sets the clear color
+	 */
+	void SetClearColor(Color clearColor);
+	
+	/**
+	 * Sets the clear color
+	 */
+	void SetClearColor(float red, float blue, float green, float alpha);
 
-    /**
-     * Sets the clear color
-     */
-    void SetClearColor(Color clearColor);
+	/**
+	 * Registers a sprite to be drawn
+	 *
+	 * Throws an invalid_argument if the sprite was already registered.
+	 */
+	void RegisterSprite(Sprite* sprite);
 
-    /**
-     * Sets the clear color
-     */
-    void SetClearColor(float red, float blue, float green, float alpha);
+	/**
+	 * Unregisters a sprite so it will no longer be drawn
+	 *
+	 * Throws an invalid_argument if the sprite wasn't registered.
+	 */
+	void UnRegisterSprite(Sprite* sprite);
 
-    /**
-     * Registers a sprite to be drawn
-     *
-     * Throws an invalid_argument if the sprite was already registered.
-     */
-    void RegisterSprite(std::shared_ptr<Sprite> sprite);
+	/**
+	 * Obtains the number of registered sprite.
+	 */
+	int GetSpriteCount();
 
-    /**
-     * Unregisters a sprite so it will no longer be drawn
-     *
-     * Throws an invalid_argument if the sprite wasn't registered.
-     */
-    void UnRegisterSprite(std::shared_ptr<Sprite> sprite);
+	/**
+	 * Prepares to add all sprites with the AddSpriteToVCIBuffer method
+	 */
+	void PrepareToAddSprites();
 
-    /**
-     * Obtains the number of registered sprite.
-     */
-    int GetSpriteCount();
-
-    /**
-     * Obtains a pointer to the camera.
-     */
-    std::shared_ptr<Camera> GetCamera();
-
-    /**
-     * Prepares to add all sprites with the AddSpriteToVCIBuffer method
-     */
-    void PrepareToAddSprites();
-
-    /**
-     * Adds the next sprite's vertex, color, and index information to the
-     * given vertex buffer.
-     *
-     * Returns true if the sprite's data was successfully added; false if
-     * there are no more sprites to be added or PrepareToAddSprites hasn't
-     * been called.
-     * 
-     * DO NOT CALL THIS METHOD IF THERE IS NOT SPACE FOR 16 values for
-     * each sprite (16 * GetSpriteCount()).
-     */
-    bool AddSpriteToVCIBuffer(float* vertexBuffer, float* colorBuffer, unsigned short* indexBuffer, unsigned short dataStartIndex);
-
-    /**
-     * Returns the render mode for the last sprite to be used in AddSpriteToVCIBuffer
-     */
-    SpriteRenderMode GetCurrentRenderMode();
-
+	/**
+	 * Adds the next sprite's vertex, color, and index information to the
+	 * given vertex buffer.
+	 *
+	 * Returns true if the sprite's data was successfully added; false if
+	 * there are no more sprites to be added or PrepareToAddSprites hasn't
+	 * been called.
+	 * 
+	 * DO NOT CALL THIS METHOD IF THERE IS NOT SPACE FOR 16 values for
+	 * each sprite (16 * GetSpriteCount()).
+	 */
+	bool AddSpriteToVCIBuffer(float* vertexBuffer, float* colorBuffer, unsigned short* indexBuffer, unsigned short dataStartIndex);
+    
 private:
     // Private constructors to disallow access.
     GraphicsManager(GraphicsManager const &other);
     GraphicsManager operator=(GraphicsManager other);
 
-    Color clearColor;
-    std::shared_ptr<Camera> camera;
-    std::set<std::shared_ptr<Sprite>> registeredSprites;
-    std::mutex registeredSpritesMutex;
-    std::set<std::shared_ptr<Sprite>>::iterator spriteIterator;
-    SpriteRenderMode currentRenderingMode;
+	/**
+	 * Clear color of screen
+	 */
+	Color clearColor;
+	
+	std::set<Sprite*> registeredSprites;
+	std::mutex registeredSpritesMutex;
+	std::set<Sprite*>::iterator spriteIterator;
 };
 
 #endif

@@ -53,7 +53,6 @@ solution "Engine"
             "sfml-window-d",
 	        "soil2-windows-debug"
         }
-
 moduleNames = os.matchdirs("modules/*")
 for i = 1,table.getn(moduleNames) do
     moduleNames[i] = string.gsub(moduleNames[i], "modules/", "", 1)
@@ -109,7 +108,7 @@ project "Game"
     libdirs {
         "game/lib"
     }
-	for i = 1,table.getn(moduleNames) do
+    for i = 1,table.getn(moduleNames) do
         links {moduleNames[i]}
     end
 

@@ -1,37 +1,21 @@
-#ifndef Core_InputManager_h
-#define Core_InputManager_h
+#ifndef Common_InputManager_h
+#define Common_InputManager_h
 
-#include "KeyboardKey.h"
-#include "MouseButton.h"
-#include <map>
-#include <functional>
-#include <memory>
+#include "InputView.h"
+#include "IKeyPressEventHandler.h"
+#include "IKeyReleaseEventHandler.h"
+#include "InputState.h"
+#include "InputCode.h"
+#include "vector"
+#include "unordered_map"
+#include "set"
 
 class InputView;
-class KeyboardKeyPressEvent;
-class KeyboardKeyReleaseEvent;
-class MouseEvent;
-class MouseButtonPressEvent;
-class MouseButtonReleaseEvent;
-enum class InputState;
-
-enum class MouseInputMode
-{
-    SHOW,
-    HIDE,
-    HIDE_AND_LOCK
-};
-
-class InputManager
+class KeyPressEvent;
+class KeyReleaseEvent;
+class InputManager : IKeyPressEventHandler, IKeyReleaseEventHandler
 {
 public:
-    // Use traditional pointers here because C++ does not support shared function pointers
-    // How does this work if the object that owns the function is destroyed?
-    typedef std::function<void (MouseEvent)> MouseMotionHandler;
-    typedef std::function<void (MouseButtonPressEvent)> MouseButtonPressHandler;
-    typedef std::function<void (MouseButtonReleaseEvent)> MouseButtonReleaseHandler;
-    typedef std::function<void (KeyboardKeyPressEvent)> KeyboardKeyPressHandler;
-    typedef std::function<void (KeyboardKeyReleaseEvent)> KeyboardKeyReleaseHandler;
 
     /**
      * Default constructor that creates a new instance of a InputManager.
@@ -43,170 +27,119 @@ public:
     void Update();
 
     /**
-     * Associate an InputView with this InputManager. The InputView specified here will be used to poll input state on demand. 
+     * Associate an InputView with this InputManager. The InputView specified 
+     * here will be used to poll input state on demand. 
      * Only one InputView may be associated with an InputManager at a time.
-     * @param inputView InputView to associated with this InputManager
      */
-    void SetView(std::shared_ptr<InputView> inputView);
+    void SetView(InputView* inputView);
 
     /**
-     * Set the mouse cursor behavior.
-     * @param mode one of the following:
-     * * MouseInputMode::SHOW - Draw the operating system cursor.
-     * * MouseInputMode::HIDE - Hide the operating system cursor.
-     * * MouseInputMode::HIDE_AND_LOCK - Hide the operating system cursor and lock the cursor to the game window.
+     * Register a KeyPressEventHandler to receive KeyPressEvents.
+     * @param[in] handler Pointer to the KeyPressEventHandler to register. If
+     * the handler does not have an existing registration with this InputManager,
+     * a new registration will be created. If the handler has an existing 
+     * registration with this InputManager, the existing registration will be modified.
+     * @param[in] keyCodes Vector of key codes corresponding to keyboard keys
+     * that should cause KeyPressEvents to be fired when pressed. If the handler does not
+     * have an existing registration with this InputManager, the new registration will
+     * be initialized with the contents of this vector. If the handler has an existing
+     * registration with this InputManager, the registration will be updated with the 
+     * set union of the contents of this vector and the key codes in the existing
+     * registration.
      */
-    void SetMouseInputMode(MouseInputMode mode);
+    void RegisterKeyPressEventHandler(IKeyPressEventHandler* handler, std::vector<KeyCode> keyCodes);
 
     /**
-     * Get the current mouse cursor behavior.
-     * @return one of the following:
-     * * MouseInputMode::SHOW - The operating system cursor is being drawn.
-     * * MouseInputMode::HIDE - The operating system cursor is hidden.
-     * * MouseInputMode::HIDE_AND_LOCK - The operating system cursor is hidden and the cursor is locked to the game window.
+     * Deregister a KeyPressEventHandler which will no longer receive KeyPressEvents.
+     * @param[in] handler Pointer to the KeyPressEventHandler to deregister. 
+     * If the handler does not have an existing registration with this InputManager, 
+     * this function has no effect. 
+     * @param[in] keyCodes Vector of key codes corresponding to keyboard keys
+     * that should no longer cause KeyPressEvents to be fired when pressed. If the handler
+     * has an existing registration with this InputManager, the registration will be updated
+     * with the relative complement of the contents of this vector with respect to the key codes
+     * in the existing registration. If the result of this operation is an empty set, the handler's
+     * registration will be removed from this InputManager.
      */
-    MouseInputMode GetMouseInputMode();
+    void DeregisterKeyPressEventHandler(IKeyPressEventHandler* handler, std::vector<KeyCode> keyCodes);
 
     /**
-     * Register a function to handle mouse input.
-     * @param handler A function which will receive and handler MouseEvents when the mouse cursor is moved.
-     * Any existing handler will be overwritten.
+     *True if the given KEyCode has at least one registered press event handler. False otherwise
      */
-    void RegisterMouseMotionHandler(MouseMotionHandler handler);
+    bool IsRegisteredKeyPress(KeyCode* keyCode);
 
     /**
-     * Register a function to handle mouse button presses.
-     * @param button A mouse button.
-     * @param handler A function which will receive and handle MouseButtonPressEvents when the specified mouse button is pressed.
-     * Any existing button press handler for the specified mouse button will be overwritten.
+     * Register a KeyReleaseEventHandler to receive KeyReleaseEvents.
+     * @param[in] handler Pointer to the KeyReleaseEventHandler to register. If
+     * the handler does not have an existing registration with this InputManager,
+     * a new registration will be created. If the handler has an existing 
+     * registration with this InputManager, the existing registration will be modified.
+     * @param[in] keyCodes Vector of key codes corresponding to keyboard keys
+     * that should cause KeyReleaseEvents to be fired when released. If the handler does not
+     * have an existing registration with this InputManager, the new registration will
+     * be initialized with the contents of this vector. If the handler has an existing
+     * registration with this InputManager, the registration will be updated with the 
+     * set union of the contents of this vector and the key codes in the existing
+     * registration.
      */
-    void RegisterMouseButtonPressHandler(MouseButton button, MouseButtonPressHandler handler);
+    void RegisterKeyReleaseEventHandler(IKeyReleaseEventHandler* handler, std::vector<KeyCode> keyCodes);
 
     /**
-     * Register a function to handle mouse button releases.
-     * @param button A mouse button.
-     * @param handler A function which will receive and handle MouseButtonReleaseEvents when the specified mouse button is released.
-     * Any existing button released handler for the specified mouse button will be overwritten.
+     * Deregister a KeyReleaseEventHandler which will no longer receive KeyReleaseEvents.
+     * @param[in] handler Pointer to the KeyReleaseEventHandler to deregister. 
+     * If the handler does not have an existing registration with this InputManager, 
+     * this function has no effect. 
+     * @param[in] keyCodes Vector of key codes int values corresponding to keyboard keys
+     * that should no longer cause KeyReleaseEvents to be fired when released. If the handler
+     * has an existing registration with this InputManager, the registration will be updated
+     * with the relative complement of the contents of this vector with respect to the key codes
+     * in the existing registration. If the result of this operation is an empty set, the handler's
+     * registration will be removed from this InputManager.
      */
-    void RegisterMouseButtonReleaseHandler(MouseButton button, MouseButtonReleaseHandler handler);
+    void DeregisterKeyReleaseEventHandler(IKeyReleaseEventHandler* handler, std::vector<KeyCode> keyCodes);
 
     /**
-     * Register a function to handle keyboard key presses.
-     * @param key A keyboard key.
-     * @param handler A function which will receive and handle KeyboardKeyPressEvents when the specified key is pressed.
-     * Any existing key press handler for the specified key will be overwritten.
+     * True if the given KeyCode has at least one registered release event handler. False otherwise.
      */
-    void RegisterKeyboardKeyPressHandler(KeyboardKey key, KeyboardKeyPressHandler handler);
-
-    /**
-     * Register a function to handle keyboard key presses.
-     * @param key A keyboard key.
-     * @param handler A function which will receive and handle KeyboardKeyPressEvents when the specified key is released.
-     * Any existing key release handler for the specified key will be overwritten.
-     */
-    void RegisterKeyboardKeyReleaseHandler(KeyboardKey key, KeyboardKeyReleaseHandler handler);
-    
-    /**
-     * Remove any existing mouse input handler.
-     */
-    void DeregisterMouseMotionHandler();   
- 
-    /**
-     * Remove any existing mouse button press handler for the specified button.
-     * @param button A mouse button.
-     */
-    void DeregisterMouseButtonPressHandler(MouseButton button);
-
-    /**
-     * Remove any existing mouse button release handler for the specified button.
-     * @param button A mouse button.
-     */
-    void DeregisterMouseButtonReleaseHandler(MouseButton button);
-
-    /**
-     * Remove any existing keyboard key press handler for the specified button.
-     * @param key A keyboard key.
-     */
-    void DeregisterKeyboardKeyPressHandler(KeyboardKey key);
-
-    void DeregisterKeyboardKeyReleaseHandler(KeyboardKey key);
-
-    /**
-     * True if the given KeyboardKey has at least one registered release event handler. False otherwise.
-     */
-    bool IsRegisteredEventHandler(KeyboardKey key);
+    bool IsRegisteredKeyRelease(KeyCode* keyCode);
 
     /**
      * Poll the current state of a key.
-     * @param key The keyboard key to poll.
-     * @return the current state of the keyboard key.
+     * @param keyCode Key code corresponding to a keyboard key.
+     * @return InputState indicating the current state of a key.
      * If an invalid key code was passed, KeyState::Invalid is returned.
      */
-    InputState GetKeyState(KeyboardKey key);
+    InputState GetKeyState(KeyCode keyCode);
 
     /**
-     * Poll the current state of a mouse button.
-     * @param button The mouse button to poll.
-     * @return the current state of the mouse button
+     * Implemented from IKeyPressEventHandler. Distributes event to registered event handlers.
+     * Should be called only by InputView.
      */
-    InputState GetMouseButtonState(MouseButton button);
-
-    /**
-     * Poll the horizontal coordinate of the mouse cursor. 
-     * @return the x coordinate of the mouse cursor within the game window. The left edge of the game window is the origin.
-     */
-    int GetMouseX();
-
-    /**
-     * Poll the vertical coordinate of the mouse cursor.
-     * @return the y coordinate of the mouse cursor within the game window. The top edge of the game window is the origin.
-     */
-    int GetMouseY();
-
-    /**
-     * Distributes event to registered event handlers. Should be called only by InputView.
-     * @param event event to distribute.
-     */
-    void OnKeyboardKeyPress(KeyboardKeyPressEvent event);
+    void OnKeyPressEvent(KeyPressEvent* event);
     
     /**
-     * Distributes event to registered event handlers. Should be called only by InputView.
-     * @param event event to distribute.
+     * Implemented from IKeyReleaseEventHandler. Distributes event to registered event handlers.
+     * Should be called only by InputView.
      */
-    void OnKeyboardKeyRelease(KeyboardKeyReleaseEvent event);
-
-    /**
-     * Distributes event to registered event handlers. Should be called only by InputView.
-     * @param event event to distribute.
-     */
-    void OnMouseInput(MouseEvent event);
-
-    /**
-     * Distributes event to registered event handlers. Should be called only by InputView.
-     * @param event event to distribute.
-     */
-    void OnMouseButtonPress(MouseButtonPressEvent event);
-
-    /**
-     * Distributes event to registered event handlers. Should be called only by InputView.
-     * @param event event to distribute.
-     */
-    void OnMouseButtonRelease(MouseButtonReleaseEvent event);
+    void OnKeyReleaseEvent(KeyReleaseEvent* event);
     
+	/**
+	* Sets all variables of this instance to match the other instance.
+	*/
+	void CopyFrom(InputManager* other);
+
 private:
     // Private constructors to disallow access.
     InputManager(InputManager const &other);
     InputManager operator=(InputManager other);
 
-    // InputView which is polled for ondemand input.
-    std::weak_ptr<InputView> inputView;
-    
-    // Registered event handlers
-    MouseMotionHandler mouseMotionHandler;
-    std::map<MouseButton, MouseButtonPressHandler> mouseButtonPressHandlers;
-    std::map<MouseButton, MouseButtonReleaseHandler> mouseButtonReleaseHandlers;
-    std::map<KeyboardKey, KeyboardKeyPressHandler> keyboardKeyPressHandlers;
-    std::map<KeyboardKey, KeyboardKeyReleaseHandler> keyboardKeyReleaseHandlers;
+    // InputView which fires input events.
+    InputView* inputView;
+   
+    // Maps of registered keys and their associated handlers. 
+    // C++ strong enums are not usable as map keys, so a cast to int is required.
+    std::unordered_map<int, std::set<IKeyPressEventHandler*>> registeredKeyPressEventHandlers;
+    std::unordered_map<int, std::set<IKeyReleaseEventHandler*>> registeredKeyReleaseEventHandlers;
 };
 
 #endif

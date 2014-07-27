@@ -1,46 +1,50 @@
 #include "ControllerPackage.h"
 
-std::weak_ptr<ControllerPackage> ControllerPackage::activeControllerPackage;
+ControllerPackage* ControllerPackage::activeControllerPackage = nullptr;
 
-ControllerPackage::ControllerPackage(std::shared_ptr<GraphicsManager> graphicsManager, std::shared_ptr<InputManager> inputManager, std::shared_ptr<SoundManager> soundManager)
+ControllerPackage::ControllerPackage(GraphicsManager* const graphicsManager, InputManager* const inputManager, SoundManager* const soundManager, ResourceManager* const resourceManager)
 : graphicsManager(graphicsManager),
 inputManager(inputManager),
-soundManager(soundManager)
+soundManager(soundManager),
+resourceManager(resourceManager)
 {
-
+	
 }
 
 ControllerPackage::~ControllerPackage()
 {
-
+	delete this->graphicsManager;
+	delete this->inputManager;
+	delete this->soundManager;
 }
 
-std::shared_ptr<GraphicsManager> ControllerPackage::GetGraphicsManager()
+GraphicsManager* const ControllerPackage::GetGraphicsManager()
 {
-    return this->graphicsManager;
+	return this->graphicsManager;
 }
 
-std::shared_ptr<InputManager> ControllerPackage::GetInputManager()
+
+InputManager* const ControllerPackage::GetInputManager()
 {
-    return this->inputManager;
+	return this->inputManager;
 }
 
-std::shared_ptr<SoundManager> ControllerPackage::GetSoundManager()
+SoundManager* const ControllerPackage::GetSoundManager()
 {
-    return this->soundManager;
+	return this->soundManager;
 }
 
-std::shared_ptr<ResourceManager> ControllerPackage::GetResourceManager()
+ResourceManager* const ControllerPackage::GetResourceManager()
 {
     return this->resourceManager;
 }
 
 void ControllerPackage::Activate()
 {
-    ControllerPackage::activeControllerPackage = this->shared_from_this();
+    ControllerPackage::activeControllerPackage = this;
 }
 
-std::weak_ptr<ControllerPackage> ControllerPackage::GetActiveControllerPackage()
+ControllerPackage* ControllerPackage::GetActiveControllerPackage()
 {
     return ControllerPackage::activeControllerPackage;
 }
