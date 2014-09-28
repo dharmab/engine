@@ -2,7 +2,8 @@
 
 ControllerPackage* ControllerPackage::activeControllerPackage = nullptr;
 
-ControllerPackage::ControllerPackage(GraphicsManager* const graphicsManager, InputManager* const inputManager, SoundManager* const soundManager, ResourceManager* const resourceManager)
+
+ControllerPackage::ControllerPackage(std::shared_ptr<Model::IGraphicsManager> graphicsManager, std::shared_ptr<InputManager> inputManager, std::shared_ptr<SoundManager> soundManager)
 : graphicsManager(graphicsManager),
 inputManager(inputManager),
 soundManager(soundManager),

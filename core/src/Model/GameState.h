@@ -2,6 +2,7 @@
 #define Core_GameState_h
 
 #include "GameStateManager.h"
+
 class GameStateManager;
 
 /**
@@ -44,13 +45,14 @@ protected:
      */
     GameStateManager* manager;
 
-	/**
-	 * Pointers to the managers of the controller package
-	 */
-	GraphicsManager* graphicsManager;
-	InputManager* inputManager;
-	SoundManager* soundManager;
-    ResourceManager* resourceManager;
+
+    /**
+     * Pointers to the managers of the controller package
+     */
+    std::shared_ptr<Model::IGraphicsManager> graphicsManager;
+    std::shared_ptr<InputManager> inputManager;
+    std::shared_ptr<SoundManager> soundManager;
+    std::shared_ptr<ResourceManager> resourceManager;
 
 private:
 	/**

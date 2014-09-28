@@ -16,7 +16,7 @@ void GraphicsView::Initialize()
 {
 }
 
-void GraphicsView::Update(GraphicsManager* graphicsManager)
+void GraphicsView::Update(std::shared_ptr<View::IGraphicsManager> graphicsManager)
 {
 	// Clear the screen
 	Color clearColor = graphicsManager->GetClearColor();
