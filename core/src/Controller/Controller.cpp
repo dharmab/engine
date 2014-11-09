@@ -1,5 +1,5 @@
 #include "Controller.h"
-#include "GraphicsManager.h"
+#include "IGraphicsManager.h"
 #include "IInputManager.h"
 #include "SoundManager.h"
 #include "ManagerCast.h"
@@ -85,7 +85,7 @@ void Controller::updateViews(GraphicsView* graphicsView, InputView* inputView, s
         return;
     }
 
-    graphicsView->Update(controllerPackage->GetGraphicsManager());
+    graphicsView->Update(ManagerCast::CastGraphicsManagerToGraphicsManagerView(controllerPackage->GetGraphicsManager()));
     inputView->Update(ManagerCast::CastInputManagerToInputManagerView(controllerPackage->GetInputManager()));
     (*soundView)->Update(controllerPackage->GetSoundManager());
 }

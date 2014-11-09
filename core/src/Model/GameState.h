@@ -53,7 +53,7 @@ protected:
     /**
      * Pointers to the managers of the controller package
      */
-    std::shared_ptr<GraphicsManager> graphicsManager;
+    std::shared_ptr<Model::IGraphicsManager> graphicsManager;
     std::shared_ptr<Model::IInputManager> inputManager;
     std::shared_ptr<SoundManager> soundManager;
     std::shared_ptr<ResourceManager> resourceManager;
