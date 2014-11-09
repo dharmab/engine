@@ -3,6 +3,8 @@ if os.get() == "windows" then
    pythonExecutable = "python" 
 end
 
+textureIdGenerationScript = path.getabsolute("scripts/GenerateTextureIds.py")
+
 solution "Engine"
     configurations {"Debug", "Release"}
     configuration "Debug"
@@ -98,7 +100,7 @@ project "Core"
     	    "soil2-mac" 
         }
     prebuildcommands {
-        pythonExecutable .. " scripts/GenerateTextureIds.py"
+        pythonExecutable .. " " .. textureIdGenerationScript
     }
 
 project "Game"
